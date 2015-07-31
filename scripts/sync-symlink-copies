@@ -1,0 +1,44 @@
+#! /bin/sh
+TARGET=$HOME/.homedir/symlink-copies
+
+set -e
+trap 'test $? = 0 || echo "Failed!" >& 2' 0
+ao=
+back=false
+DEBUG=false
+while getopts nvBD OPT
+do
+	case $OPT in
+		[nv]) ao="$ao -$OPT";;
+		B) back=true;;
+		D) DEBUG=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+test -e "$TARGET" || mkdir -- "$TARGET"
+if $back
+then
+	from=$TARGET; to=$HOME
+else
+	from=$HOME; to=$TARGET
+fi
+set -- `find "$from" -path "$from/*/*" -prune -o ! -path "$from" -type l -print`
+n=$#
+while test $n != 0
+do
+	L=$1; shift
+	case `readlink -- "$L"` in
+		.cache/* | .homedir/*) set -- "$@" "$L"
+	esac
+	n=`expr $n - 1 || :`
+done
+if test $# = 0
+then
+	set true "no links to sync!"
+else
+	set rsync -vlt$ao "$@" "$to"/
+fi
+$DEBUG && set echo SIMULATION: $@ >& 2
+exec "$@"
